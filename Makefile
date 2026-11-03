@@ -2,6 +2,7 @@ CC ?= clang
 ARCH_FLAGS ?= -arch arm64 -arch x86_64
 CFLAGS ?= -O2 -Wall -Wextra -fobjc-arc $(ARCH_FLAGS)
 FRAMEWORKS = -framework Cocoa -framework AVFoundation
+CODESIGN_IDENTITY ?= -
 
 APP_NAME = Human
 BUNDLE_NAME = $(APP_NAME).app
@@ -24,8 +25,8 @@ all: $(BUILD_DIR)/$(APP_NAME) app
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/$(APP_NAME): $(SRC) $(PLIST) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(FRAMEWORKS) -Wl,-sectcreate,__TEXT,__info_plist,$(PLIST) $(SRC) -o $@
+$(BUILD_DIR)/$(APP_NAME): $(SRC) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(FRAMEWORKS) $(SRC) -o $@
 
 $(ICON_ICNS): $(ICON_PNG) | $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/AppIcon.iconset
@@ -47,6 +48,7 @@ app: $(BUILD_DIR)/$(APP_NAME) $(PLIST) $(ICON_ICNS) | $(BUILD_DIR)
 	cp $(BUILD_DIR)/$(APP_NAME) $(MACOS)/$(APP_NAME)
 	cp $(PLIST) $(CONTENTS)/Info.plist
 	cp $(ICON_ICNS) $(RESOURCES)/AppIcon.icns
+	codesign --force --deep --sign $(CODESIGN_IDENTITY) $(BUILD_DIR)/$(BUNDLE_NAME)
 
 dist: app
 	rm -f $(DIST_ZIP)
