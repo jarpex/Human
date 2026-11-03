@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,29 +18,47 @@ jobs:
   release:
     name: Build and Release
     runs-on: macos-latest
+    outputs:
+      sha256: ${{ steps.checksum.outputs.hash }}
+      tag: ${{ steps.vars.outputs.tag }}
     steps:
+      - name: Determine tag
+        id: vars
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          TAG="${INPUT_TAG:-$REF_NAME}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ steps.vars.outputs.tag }}
 
       - name: Build universal app and archive
+        id: checksum
         run: |
           make dist
-          shasum -a 256 build/Human.zip > build/Human.zip.sha256
+          HASH=$(shasum -a 256 build/Human.zip | awk '{print $1}')
+          echo "$HASH  Human.zip" > build/Human.zip.sha256
           cat build/Human.zip.sha256
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: release_notes
+        env:
+          TAG: ${{ steps.vars.outputs.tag }}
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
           
           if [ -z "$PREVIOUS_TAG" ]; then
             echo "First release! Generating notes from beginning..."
-            LOG_RANGE="${{ github.ref_name }}"
+            LOG_RANGE="$TAG"
           else
-            echo "Generating notes between $PREVIOUS_TAG and ${{ github.ref_name }}..."
-            LOG_RANGE="$PREVIOUS_TAG..${{ github.ref_name }}"
+            echo "Generating notes between $PREVIOUS_TAG and $TAG..."
+            LOG_RANGE="$PREVIOUS_TAG..$TAG"
           fi
           
           echo "## What's Changed" > RELEASE_NOTES.md
@@ -87,8 +111,9 @@ jobs:
           echo "| \`Human.zip\` | \`$HASH\` |" >> RELEASE_NOTES.md
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.vars.outputs.tag }}
           body_path: RELEASE_NOTES.md
           files: |
             build/Human.zip
@@ -96,3 +121,59 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: false
+
+  update-cask:
+    name: Update Homebrew Cask
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check token
+        id: check_token
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "No tap token secret configured; skipping automatic cask update."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout source repository
+        if: steps.check_token.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout Homebrew Tap
+        if: steps.check_token.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: jarpex/homebrew-formulae
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN || secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update Cask file
+        if: steps.check_token.outputs.skip == 'false'
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+          SHA: ${{ needs.release.outputs.sha256 }}
+        run: |
+          VERSION="${TAG#v}"
+          source/scripts/update-cask.sh tap/Casks/human.rb "$VERSION" "$SHA"
+
+      - name: Commit and push Cask update
+        if: steps.check_token.outputs.skip == 'false'
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/human.rb
+          if git diff --cached --quiet; then
+            echo "Cask is already up to date"
+            exit 0
+          fi
+          git commit -m "feat(cask): update human to ${TAG}"
+          git push
