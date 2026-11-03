@@ -98,11 +98,7 @@ jobs:
             echo "$OTHER" >> RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
           fi
-          
-          echo "### Contributors" >> RELEASE_NOTES.md
-          git log $LOG_RANGE --format="- @%an" | sort -u >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          
+
           echo "## SHA256 Checksums" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
           echo "| File | Checksum |" >> RELEASE_NOTES.md
