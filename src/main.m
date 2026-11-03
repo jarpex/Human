@@ -102,7 +102,7 @@
 - (void)setupAppIcon {
     NSString *iconPath = [[NSBundle mainBundle] pathForResource:@"AppIcon" ofType:@"icns"];
     if (!iconPath) {
-        NSArray *candidates = @[@"AppIcon.icns", @"Icons/AppIcon.png"];
+        NSArray *candidates = @[@"build/AppIcon.icns", @"resources/AppIcon.png", @"AppIcon.icns"];
         for (NSString *cand in candidates) {
             if ([[NSFileManager defaultManager] fileExistsAtPath:cand]) {
                 iconPath = cand;

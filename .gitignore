@@ -1,7 +1,7 @@
+build/
 Human
 Human.app
 AppIcon.icns
 AppIcon.iconset
 *.o
 .DS_Store
-
