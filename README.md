@@ -1,6 +1,6 @@
 # Human
 
-Floating macOS webcam preview window. Inspired by [hayyoth.org](https://hayyoth.org/).
+Floating macOS webcam preview window. Inspired by [hayyoth.org](https://hayyoth.org/) videos.
 
 ## Requirements
 
