@@ -81,6 +81,7 @@
     self.window.contentView = self.cameraView;
 
     [self setupMenu];
+    [self setupAppIcon];
     [self startCamera];
 
     [self.window makeKeyAndOrderFront:nil];
@@ -96,6 +97,25 @@
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Quit Human" action:@selector(terminate:) keyEquivalent:@"q"]];
     appMenuItem.submenu = appMenu;
     NSApp.mainMenu = menubar;
+}
+
+- (void)setupAppIcon {
+    NSString *iconPath = [[NSBundle mainBundle] pathForResource:@"AppIcon" ofType:@"icns"];
+    if (!iconPath) {
+        NSArray *candidates = @[@"AppIcon.icns", @"Icons/AppIcon.png"];
+        for (NSString *cand in candidates) {
+            if ([[NSFileManager defaultManager] fileExistsAtPath:cand]) {
+                iconPath = cand;
+                break;
+            }
+        }
+    }
+    if (iconPath) {
+        NSImage *icon = [[NSImage alloc] initWithContentsOfFile:iconPath];
+        if (icon) {
+            [NSApp setApplicationIconImage:icon];
+        }
+    }
 }
 
 - (void)startCamera {
