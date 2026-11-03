@@ -22,8 +22,7 @@ cask "human" do
   app "Human.app"
 
   postflight_steps do
-    system_command "/usr/bin/xattr",
-                   args: ["-cr", "#{appdir}/Human.app"]
+    run "/usr/bin/xattr", "-d", "com.apple.quarantine", "#{appdir}/Human.app"
   end
 
   zap trash: "~/Library/Saved Application State/com.jarpex.human.savedState"
