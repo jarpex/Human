@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.jarpex.camera</string>
+    <string>com.jarpex.human</string>
     <key>CFBundleName</key>
     <string>Human</string>
     <key>CFBundleDisplayName</key>
