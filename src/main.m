@@ -2,26 +2,29 @@
 #import <AVFoundation/AVFoundation.h>
 
 @interface CameraView : NSView
-@property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
+@property (nonatomic, readonly) AVCaptureVideoPreviewLayer *previewLayer;
 @property (nonatomic, strong) NSTextField *statusLabel;
 @end
 
 @implementation CameraView
 
-- (void)layout {
-    [super layout];
-    self.previewLayer.frame = self.bounds;
+- (instancetype)initWithFrame:(NSRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.wantsLayer = YES;
+    }
+    return self;
 }
 
-- (void)setPreviewLayer:(AVCaptureVideoPreviewLayer *)previewLayer {
-    if (_previewLayer) {
-        [_previewLayer removeFromSuperlayer];
-    }
-    _previewLayer = previewLayer;
-    if (_previewLayer) {
-        _previewLayer.frame = self.bounds;
-        [self.layer addSublayer:_previewLayer];
-    }
+- (CALayer *)makeBackingLayer {
+    AVCaptureVideoPreviewLayer *layer = [AVCaptureVideoPreviewLayer layer];
+    layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    layer.backgroundColor = [NSColor blackColor].CGColor;
+    return layer;
+}
+
+- (AVCaptureVideoPreviewLayer *)previewLayer {
+    return (AVCaptureVideoPreviewLayer *)self.layer;
 }
 
 - (void)showStatus:(NSString *)text {
@@ -76,12 +79,9 @@
     [self.window center];
 
     self.cameraView = [[CameraView alloc] initWithFrame:self.window.contentView.bounds];
-    self.cameraView.wantsLayer = YES;
-    self.cameraView.layer.backgroundColor = [NSColor blackColor].CGColor;
     self.window.contentView = self.cameraView;
 
     [self setupMenu];
-    [self setupAppIcon];
     [self startCamera];
 
     [self.window makeKeyAndOrderFront:nil];
@@ -97,25 +97,6 @@
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Quit Human" action:@selector(terminate:) keyEquivalent:@"q"]];
     appMenuItem.submenu = appMenu;
     NSApp.mainMenu = menubar;
-}
-
-- (void)setupAppIcon {
-    NSString *iconPath = [[NSBundle mainBundle] pathForResource:@"AppIcon" ofType:@"icns"];
-    if (!iconPath) {
-        NSArray *candidates = @[@"build/AppIcon.icns", @"resources/AppIcon.png", @"AppIcon.icns"];
-        for (NSString *cand in candidates) {
-            if ([[NSFileManager defaultManager] fileExistsAtPath:cand]) {
-                iconPath = cand;
-                break;
-            }
-        }
-    }
-    if (iconPath) {
-        NSImage *icon = [[NSImage alloc] initWithContentsOfFile:iconPath];
-        if (icon) {
-            [NSApp setApplicationIconImage:icon];
-        }
-    }
 }
 
 - (void)startCamera {
@@ -175,16 +156,13 @@
         [self.session addInput:input];
     }
 
-    AVCaptureVideoPreviewLayer *previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:self.session];
-    previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    self.cameraView.previewLayer.session = self.session;
 
-    AVCaptureConnection *conn = previewLayer.connection;
+    AVCaptureConnection *conn = self.cameraView.previewLayer.connection;
     if (conn.supportsVideoMirroring) {
         conn.automaticallyAdjustsVideoMirroring = NO;
         conn.videoMirrored = YES;
     }
-
-    self.cameraView.previewLayer = previewLayer;
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [self.session startRunning];
