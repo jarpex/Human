@@ -25,9 +25,18 @@ Or run the binary directly:
 ./build/Human
 ```
 
-## Install
+## Installation
+
+### Homebrew
 
 ```sh
+brew install --cask jarpex/formulae/human
+```
+
+### From Source
+
+```sh
+make
 make install
 ```
 

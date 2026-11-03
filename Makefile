@@ -1,5 +1,6 @@
 CC ?= clang
-CFLAGS ?= -O2 -Wall -Wextra -fobjc-arc
+ARCH_FLAGS ?= -arch arm64 -arch x86_64
+CFLAGS ?= -O2 -Wall -Wextra -fobjc-arc $(ARCH_FLAGS)
 FRAMEWORKS = -framework Cocoa -framework AVFoundation
 
 APP_NAME = Human
@@ -8,6 +9,7 @@ BUILD_DIR = build
 CONTENTS = $(BUILD_DIR)/$(BUNDLE_NAME)/Contents
 MACOS = $(CONTENTS)/MacOS
 RESOURCES = $(CONTENTS)/Resources
+DIST_ZIP = $(BUILD_DIR)/$(APP_NAME).zip
 PREFIX ?= /Applications
 
 SRC = src/main.m
@@ -15,7 +17,7 @@ PLIST = resources/Info.plist
 ICON_PNG = resources/AppIcon.png
 ICON_ICNS = $(BUILD_DIR)/AppIcon.icns
 
-.PHONY: all app run install uninstall clean
+.PHONY: all app dist run install uninstall clean
 
 all: $(BUILD_DIR)/$(APP_NAME) app
 
@@ -45,6 +47,10 @@ app: $(BUILD_DIR)/$(APP_NAME) $(PLIST) $(ICON_ICNS) | $(BUILD_DIR)
 	cp $(BUILD_DIR)/$(APP_NAME) $(MACOS)/$(APP_NAME)
 	cp $(PLIST) $(CONTENTS)/Info.plist
 	cp $(ICON_ICNS) $(RESOURCES)/AppIcon.icns
+
+dist: app
+	rm -f $(DIST_ZIP)
+	ditto -c -k --keepParent $(BUILD_DIR)/$(BUNDLE_NAME) $(DIST_ZIP)
 
 run: app
 	open $(BUILD_DIR)/$(BUNDLE_NAME)

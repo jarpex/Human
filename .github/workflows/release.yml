@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build universal app and archive
+        run: |
+          make dist
+          shasum -a 256 build/Human.zip > build/Human.zip.sha256
+          cat build/Human.zip.sha256
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "First release! Generating notes from beginning..."
+            LOG_RANGE="${{ github.ref_name }}"
+          else
+            echo "Generating notes between $PREVIOUS_TAG and ${{ github.ref_name }}..."
+            LOG_RANGE="$PREVIOUS_TAG..${{ github.ref_name }}"
+          fi
+          
+          echo "## What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          FEATURES=$(git log $LOG_RANGE --no-merges --format="- %s (%h)" --grep="^feat" || true)
+          if [ -n "$FEATURES" ]; then
+            echo "### New Features" >> RELEASE_NOTES.md
+            echo "$FEATURES" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
+          
+          FIXES=$(git log $LOG_RANGE --no-merges --format="- %s (%h)" --grep="^fix" || true)
+          if [ -n "$FIXES" ]; then
+            echo "### Bug Fixes" >> RELEASE_NOTES.md
+            echo "$FIXES" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
+          
+          PERF=$(git log $LOG_RANGE --no-merges --format="- %s (%h)" --grep="^perf" || true)
+          if [ -n "$PERF" ]; then
+            echo "### Performance Improvements" >> RELEASE_NOTES.md
+            echo "$PERF" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
+          
+          DOCS=$(git log $LOG_RANGE --no-merges --format="- %s (%h)" --grep="^docs" || true)
+          if [ -n "$DOCS" ]; then
+            echo "### Documentation" >> RELEASE_NOTES.md
+            echo "$DOCS" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
+          
+          OTHER=$(git log $LOG_RANGE --no-merges --format="- %s (%h)" --invert-grep --grep="^feat" --grep="^fix" --grep="^perf" --grep="^docs" --grep="^chore(release)" || true)
+          if [ -n "$OTHER" ]; then
+            echo "### Other Changes" >> RELEASE_NOTES.md
+            echo "$OTHER" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+          fi
+          
+          echo "### Contributors" >> RELEASE_NOTES.md
+          git log $LOG_RANGE --format="- @%an" | sort -u >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          echo "## SHA256 Checksums" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "| File | Checksum |" >> RELEASE_NOTES.md
+          echo "| --- | --- |" >> RELEASE_NOTES.md
+          HASH=$(cat build/Human.zip.sha256 | awk '{print $1}')
+          echo "| \`Human.zip\` | \`$HASH\` |" >> RELEASE_NOTES.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            build/Human.zip
+            build/Human.zip.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: false
