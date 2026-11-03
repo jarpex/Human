@@ -1,0 +1,70 @@
+name: Update Homebrew Cask
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag to update cask for'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to update cask for'
+        required: true
+        type: string
+
+jobs:
+  update-cask:
+    name: Update Homebrew Cask
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get release SHA256 hash
+        id: get-hash
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          
+          # Download checksums file from release
+          URL="https://github.com/jarpex/Human/releases/download/${TAG}/Human.zip.sha256"
+          curl -sL "$URL" -o Human.zip.sha256
+          
+          HASH=$(awk '{print $1}' Human.zip.sha256)
+          if [ -z "$HASH" ]; then
+            echo "Failed to retrieve SHA256 checksum from $URL" >&2
+            exit 1
+          fi
+          
+          echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
+          echo "Found SHA256: $HASH for version $VERSION"
+
+      - name: Checkout homebrew-formulae repository
+        uses: actions/checkout@v4
+        with:
+          repository: jarpex/homebrew-formulae
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: homebrew-formulae
+
+      - name: Update Cask file
+        run: |
+          ./scripts/update-cask.sh \
+            homebrew-formulae/Casks/human.rb \
+            "${{ steps.get-hash.outputs.version }}" \
+            "${{ steps.get-hash.outputs.sha256 }}"
+
+      - name: Commit and push changes
+        run: |
+          cd homebrew-formulae
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/human.rb
+          if git diff --cached --quiet; then
+            echo "Cask is already up to date"
+            exit 0
+          fi
+          git commit -m "chore(cask): update human to ${{ inputs.tag }}"
+          git push
