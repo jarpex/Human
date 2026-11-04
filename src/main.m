@@ -76,6 +76,7 @@
     self.window.level = NSFloatingWindowLevel;
     self.window.delegate = self;
     [self.window setReleasedWhenClosed:NO];
+    [self.window setMovableByWindowBackground:YES];
     [self.window setContentMinSize:NSMakeSize(200, 150)];
     self.window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                      NSWindowCollectionBehaviorFullScreenAuxiliary;
