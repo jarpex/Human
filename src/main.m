@@ -54,6 +54,7 @@
 @property (nonatomic, strong) NSWindow *window;
 @property (nonatomic, strong) CameraView *cameraView;
 @property (nonatomic, strong) AVCaptureSession *session;
+@property (nonatomic, strong) AVCaptureDevice *currentDevice;
 @end
 
 @implementation AppDelegate
@@ -167,6 +168,8 @@
         [self.session addInput:input];
     }
 
+    self.currentDevice = device;
+
     self.cameraView.previewLayer.session = self.session;
 
     AVCaptureConnection *conn = self.cameraView.previewLayer.connection;
@@ -186,10 +189,15 @@
 }
 
 - (void)deviceWasDisconnected:(NSNotification *)notification {
-    (void)notification;
+    AVCaptureDevice *disconnectedDevice = notification.object;
+    if (!self.currentDevice || ![disconnectedDevice isEqual:self.currentDevice]) {
+        return;
+    }
+
     if (self.session) {
         AVCaptureSession *oldSession = self.session;
         self.session = nil;
+        self.currentDevice = nil;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             [oldSession stopRunning];
         });
@@ -212,6 +220,7 @@
     if (self.session) {
         AVCaptureSession *session = self.session;
         self.session = nil;
+        self.currentDevice = nil;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             [session stopRunning];
         });
