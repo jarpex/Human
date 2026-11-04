@@ -76,6 +76,8 @@
     self.window.delegate = self;
     [self.window setReleasedWhenClosed:NO];
     [self.window setContentMinSize:NSMakeSize(200, 150)];
+    self.window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+                                     NSWindowCollectionBehaviorFullScreenAuxiliary;
     [self.window center];
 
     self.cameraView = [[CameraView alloc] initWithFrame:self.window.contentView.bounds];
@@ -100,6 +102,15 @@
 }
 
 - (void)startCamera {
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(deviceWasConnected:)
+                                                 name:AVCaptureDeviceWasConnectedNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(deviceWasDisconnected:)
+                                                 name:AVCaptureDeviceWasDisconnectedNotification
+                                               object:nil];
+
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo]) {
         case AVAuthorizationStatusAuthorized:
             [self setupCaptureSession];
@@ -174,9 +185,37 @@
     return YES;
 }
 
+- (void)deviceWasDisconnected:(NSNotification *)notification {
+    (void)notification;
+    if (self.session) {
+        AVCaptureSession *oldSession = self.session;
+        self.session = nil;
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            [oldSession stopRunning];
+        });
+    }
+}
+
+- (void)deviceWasConnected:(NSNotification *)notification {
+    (void)notification;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.session || !self.session.isRunning) {
+            [self setupCaptureSession];
+        }
+    });
+}
+
 - (void)windowWillClose:(NSNotification *)notification {
     (void)notification;
-    [self.session stopRunning];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+
+    if (self.session) {
+        AVCaptureSession *session = self.session;
+        self.session = nil;
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            [session stopRunning];
+        });
+    }
 }
 
 @end
